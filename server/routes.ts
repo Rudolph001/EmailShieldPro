@@ -351,5 +351,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test data creation endpoint
+  app.post("/api/emails/create-test-data", requireAuth, async (req, res) => {
+    try {
+      // Create test emails with different scenarios
+      const testEmails = [
+        {
+          messageId: "test-001",
+          accountId: null,
+          subject: "Urgent: Credit Card Information Required",
+          sender: "phishing@external.com",
+          recipients: [{"email": "user@company.com"}],
+          body: "Dear customer, please provide your credit card number and social security number immediately. This is urgent and requires immediate action.",
+          bodyPreview: "Dear customer, please provide your credit card...",
+          hasAttachments: true,
+          attachmentInfo: [{"name": "confidential_document.pdf", "size": 1024000}],
+          receivedAt: new Date(),
+          direction: "inbound",
+          status: "pending"
+        },
+        {
+          messageId: "test-002", 
+          accountId: null,
+          subject: "Meeting Notes - Confidential",
+          sender: "colleague@company.com",
+          recipients: [{"email": "user@company.com"}],
+          body: "Hi there, here are the confidential meeting notes with proprietary information about our internal processes.",
+          bodyPreview: "Hi there, here are the confidential meeting notes...",
+          hasAttachments: false,
+          attachmentInfo: null,
+          receivedAt: new Date(),
+          direction: "inbound",
+          status: "pending"
+        },
+        {
+          messageId: "test-003",
+          accountId: null,
+          subject: "Regular Business Email",
+          sender: "partner@business.com",
+          recipients: [{"email": "user@company.com"}],
+          body: "This is a normal business email about our upcoming project collaboration.",
+          bodyPreview: "This is a normal business email...",
+          hasAttachments: false,
+          attachmentInfo: null,
+          receivedAt: new Date(),
+          direction: "inbound",
+          status: "pending"
+        }
+      ];
+
+      const createdEmails = [];
+      for (const emailData of testEmails) {
+        const email = await storage.createEmail(emailData);
+        createdEmails.push(email);
+      }
+
+      res.json({
+        success: true,
+        message: "Test emails created successfully",
+        emails: createdEmails.map(e => ({
+          id: e.id,
+          subject: e.subject,
+          sender: e.sender,
+          hasAttachments: e.hasAttachments
+        }))
+      });
+
+    } catch (error) {
+      console.error("Error creating test data:", error);
+      res.status(500).json({ error: "Failed to create test data" });
+    }
+  });
+
   return httpServer;
 }
