@@ -1,4 +1,5 @@
 import { Policy, Email, InsertThreat, InsertPolicyRecommendation } from "@shared/schema";
+import { attachmentScanner, AttachmentScanRule, KeywordMatchRule } from "./attachment-scanner.js";
 
 interface PolicyTestResult {
   matches: boolean;
@@ -7,7 +8,192 @@ interface PolicyTestResult {
   suggestedActions: string[];
 }
 
+interface ContentScanRule {
+  name: string;
+  scanSubject: boolean;
+  scanBody: boolean;
+  scanAttachments: boolean;
+  keywordRules: KeywordMatchRule[];
+  attachmentRules?: AttachmentScanRule[];
+}
+
+interface EmailScanResult {
+  ruleName: string;
+  matches: {
+    location: 'subject' | 'body' | 'attachment';
+    matchedKeywords: string[];
+    fileName?: string; // For attachment matches
+    confidence: number;
+  }[];
+  overallRiskScore: number;
+}
+
 class PolicyEngine {
+  // Enhanced email scanning for keywords in subject, body, and attachments
+  async scanEmailContent(
+    email: Email, 
+    accessToken: string | null, 
+    scanRules: ContentScanRule[]
+  ): Promise<EmailScanResult[]> {
+    const results: EmailScanResult[] = [];
+
+    for (const rule of scanRules) {
+      const scanResult: EmailScanResult = {
+        ruleName: rule.name,
+        matches: [],
+        overallRiskScore: 0
+      };
+
+      // Scan subject
+      if (rule.scanSubject && email.subject) {
+        const subjectMatches = this.scanTextForKeywords(email.subject, rule.keywordRules);
+        if (subjectMatches.length > 0) {
+          scanResult.matches.push({
+            location: 'subject',
+            matchedKeywords: subjectMatches,
+            confidence: 0.9
+          });
+        }
+      }
+
+      // Scan body
+      if (rule.scanBody && email.body) {
+        const bodyMatches = this.scanTextForKeywords(email.body, rule.keywordRules);
+        if (bodyMatches.length > 0) {
+          scanResult.matches.push({
+            location: 'body',
+            matchedKeywords: bodyMatches,
+            confidence: 0.8
+          });
+        }
+      }
+
+      // Scan attachments
+      if (rule.scanAttachments && email.hasAttachments && accessToken && rule.attachmentRules) {
+        try {
+          const attachmentResults = await attachmentScanner.scanEmailAttachments(
+            accessToken, 
+            email.messageId, 
+            rule.attachmentRules
+          );
+
+          for (const attachmentResult of attachmentResults) {
+            for (const match of attachmentResult.matches) {
+              scanResult.matches.push({
+                location: 'attachment',
+                matchedKeywords: match.matchedKeywords,
+                fileName: attachmentResult.fileName,
+                confidence: match.confidence
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Error scanning attachments:', error);
+        }
+      }
+
+      // Calculate overall risk score
+      if (scanResult.matches.length > 0) {
+        scanResult.overallRiskScore = this.calculateOverallRiskScore(scanResult.matches);
+        results.push(scanResult);
+      }
+    }
+
+    return results;
+  }
+
+  private scanTextForKeywords(text: string, keywordRules: KeywordMatchRule[]): string[] {
+    const allMatches: string[] = [];
+
+    for (const rule of keywordRules) {
+      const matches = this.findKeywordMatches(text, rule);
+      if (matches.length > 0) {
+        allMatches.push(...matches);
+      }
+    }
+
+    // Remove duplicates
+    const uniqueMatches: string[] = [];
+    for (const match of allMatches) {
+      if (!uniqueMatches.includes(match)) {
+        uniqueMatches.push(match);
+      }
+    }
+    return uniqueMatches;
+  }
+
+  private findKeywordMatches(text: string, rule: KeywordMatchRule): string[] {
+    const searchText = rule.caseSensitive ? text : text.toLowerCase();
+    const keywords = rule.caseSensitive ? rule.keywords : rule.keywords.map(k => k.toLowerCase());
+
+    switch (rule.matchType) {
+      case 'any':
+        return keywords.filter(keyword => this.containsKeyword(searchText, keyword, rule.wholeWords));
+
+      case 'all':
+        const allFound = keywords.every(keyword => this.containsKeyword(searchText, keyword, rule.wholeWords));
+        return allFound ? keywords : [];
+
+      case 'sequence':
+        return this.findSequentialKeywords(searchText, keywords, rule.wholeWords);
+
+      default:
+        return [];
+    }
+  }
+
+  private containsKeyword(text: string, keyword: string, wholeWords: boolean): boolean {
+    if (wholeWords) {
+      const wordBoundary = new RegExp(`\\b${this.escapeRegex(keyword)}\\b`, 'g');
+      return wordBoundary.test(text);
+    } else {
+      return text.includes(keyword);
+    }
+  }
+
+  private findSequentialKeywords(text: string, keywords: string[], wholeWords: boolean): string[] {
+    if (keywords.length === 0) return [];
+
+    let currentIndex = 0;
+    const foundKeywords: string[] = [];
+
+    for (const keyword of keywords) {
+      let keywordIndex: number;
+      
+      if (wholeWords) {
+        const wordBoundary = new RegExp(`\\b${this.escapeRegex(keyword)}\\b`, 'g');
+        wordBoundary.lastIndex = currentIndex;
+        const match = wordBoundary.exec(text);
+        keywordIndex = match ? match.index : -1;
+      } else {
+        keywordIndex = text.indexOf(keyword, currentIndex);
+      }
+
+      if (keywordIndex >= currentIndex) {
+        foundKeywords.push(keyword);
+        currentIndex = keywordIndex + keyword.length;
+      } else {
+        // Sequence broken
+        return [];
+      }
+    }
+
+    return foundKeywords;
+  }
+
+  private escapeRegex(string: string): string {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private calculateOverallRiskScore(matches: any[]): number {
+    if (matches.length === 0) return 0;
+
+    const baseScore = Math.min(matches.length * 15, 70);
+    const confidenceBonus = matches.reduce((sum, match) => sum + match.confidence, 0) / matches.length * 30;
+    
+    return Math.min(baseScore + confidenceBonus, 100);
+  }
+
   async checkPolicies(email: Email, analysis: any): Promise<InsertThreat[]> {
     const threats: InsertThreat[] = [];
 

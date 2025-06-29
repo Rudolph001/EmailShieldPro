@@ -6,6 +6,7 @@ import { graphApiService } from "./services/graph-api";
 import { mlService } from "./services/ml-service";
 import { setupWebSocket } from "./services/websocket";
 import { policyEngine } from "./services/policy-engine";
+import { attachmentScanner } from "./services/attachment-scanner";
 import { insertEmailAccountSchema, insertPolicySchema, insertPolicyRecommendationSchema } from "@shared/schema";
 import { z } from "zod";
 
@@ -261,6 +262,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error generating recommendations:", error);
       res.status(500).json({ error: "Failed to generate recommendations" });
+    }
+  });
+
+  // Email content scanning endpoint
+  app.post("/api/emails/scan-content", requireAuth, async (req, res) => {
+    try {
+      const { emailId, scanRules } = req.body;
+      
+      // Get email details
+      const emails = await storage.getEmailsByStatus(undefined, 1);
+      const email = emails.find(e => e.id === emailId);
+      
+      if (!email) {
+        return res.status(404).json({ error: "Email not found" });
+      }
+
+      // Get user's email account for access token
+      const accounts = await storage.getEmailAccountsByUser(req.user.id);
+      const accessToken = accounts[0]?.accessToken || null;
+
+      // Example scan rules for demonstration
+      const defaultScanRules = [
+        {
+          name: "Financial Data Detection",
+          scanSubject: true,
+          scanBody: true,
+          scanAttachments: true,
+          keywordRules: [
+            {
+              keywords: ["credit card", "social security", "bank account", "ssn"],
+              matchType: "any",
+              caseSensitive: false,
+              wholeWords: true
+            }
+          ],
+          attachmentRules: [
+            attachmentScanner.createFinancialDataRule()
+          ]
+        },
+        {
+          name: "Confidential Information",
+          scanSubject: true,
+          scanBody: true,
+          scanAttachments: true,
+          keywordRules: [
+            {
+              keywords: ["confidential", "proprietary", "internal only"],
+              matchType: "any",
+              caseSensitive: false,
+              wholeWords: true
+            },
+            {
+              keywords: ["urgent", "immediate", "action required"],
+              matchType: "all",
+              caseSensitive: false,
+              wholeWords: true
+            }
+          ],
+          attachmentRules: [
+            attachmentScanner.createConfidentialDataRule()
+          ]
+        }
+      ];
+
+      // Use provided scan rules or defaults
+      const rulesToUse = scanRules || defaultScanRules;
+      
+      // Perform content scan
+      const scanResults = await policyEngine.scanEmailContent(email, accessToken, rulesToUse);
+      
+      res.json({
+        success: true,
+        email: {
+          id: email.id,
+          subject: email.subject,
+          sender: email.sender,
+          hasAttachments: email.hasAttachments
+        },
+        scanResults,
+        totalMatches: scanResults.reduce((sum, result) => sum + result.matches.length, 0),
+        highestRiskScore: Math.max(...scanResults.map(r => r.overallRiskScore), 0)
+      });
+      
+    } catch (error) {
+      console.error("Error scanning email content:", error);
+      res.status(500).json({ error: "Failed to scan email content" });
     }
   });
 
