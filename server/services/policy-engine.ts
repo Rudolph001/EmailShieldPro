@@ -1,5 +1,6 @@
 import { Policy, Email, InsertThreat, InsertPolicyRecommendation } from "@shared/schema";
 import { attachmentScanner, AttachmentScanRule, KeywordMatchRule } from "./attachment-scanner.js";
+import { patternDetector, PatternMatch } from "./pattern-detector.js";
 
 interface PolicyTestResult {
   matches: boolean;
@@ -22,13 +23,134 @@ interface EmailScanResult {
   matches: {
     location: 'subject' | 'body' | 'attachment';
     matchedKeywords: string[];
+    patternMatches?: PatternMatch[]; // Added pattern detection results
     fileName?: string; // For attachment matches
     confidence: number;
   }[];
   overallRiskScore: number;
 }
 
+interface EnhancedPolicyRule {
+  scanLocations?: {
+    subject: boolean;
+    body: boolean;
+    attachments: boolean;
+  };
+  keywordRules?: Array<{
+    keywords: string[];
+    matchType: 'any' | 'all' | 'sequence';
+    caseSensitive: boolean;
+    wholeWords: boolean;
+  }>;
+  patternDetection?: {
+    creditCards: boolean;
+    ssn: boolean;
+    phoneNumbers: boolean;
+    bankAccounts: boolean;
+    passports: boolean;
+  };
+}
+
 class PolicyEngine {
+  // Enhanced email scanning with pattern detection and keyword matching
+  async scanEmailWithEnhancedRules(
+    email: Email,
+    accessToken: string | null,
+    enhancedRules: EnhancedPolicyRule
+  ): Promise<EmailScanResult> {
+    const result: EmailScanResult = {
+      ruleName: 'Enhanced Policy Scan',
+      matches: [],
+      overallRiskScore: 0
+    };
+
+    const textsToScan: Array<{ content: string; location: 'subject' | 'body' }> = [];
+    
+    // Collect texts based on scan locations
+    if (enhancedRules.scanLocations?.subject && email.subject) {
+      textsToScan.push({ content: email.subject, location: 'subject' });
+    }
+    
+    if (enhancedRules.scanLocations?.body && email.body) {
+      textsToScan.push({ content: email.body, location: 'body' });
+    }
+
+    // Scan each text for keywords and patterns
+    for (const { content, location } of textsToScan) {
+      const matchResult = {
+        location,
+        matchedKeywords: [] as string[],
+        patternMatches: [] as PatternMatch[],
+        confidence: 0
+      };
+
+      // Keyword detection
+      if (enhancedRules.keywordRules) {
+        for (const rule of enhancedRules.keywordRules) {
+          const keywordRule: KeywordMatchRule = {
+            keywords: rule.keywords,
+            matchType: rule.matchType,
+            caseSensitive: rule.caseSensitive,
+            wholeWords: rule.wholeWords
+          };
+          
+          const foundKeywords = this.findKeywordMatches(content, keywordRule);
+          matchResult.matchedKeywords.push(...foundKeywords);
+        }
+      }
+
+      // Pattern detection
+      if (enhancedRules.patternDetection) {
+        const patternMatches = patternDetector.detectAllPatterns(content, {
+          creditCards: enhancedRules.patternDetection.creditCards,
+          ssn: enhancedRules.patternDetection.ssn,
+          phoneNumbers: enhancedRules.patternDetection.phoneNumbers,
+          bankAccounts: enhancedRules.patternDetection.bankAccounts,
+          passports: enhancedRules.patternDetection.passports
+        });
+        
+        matchResult.patternMatches = patternMatches;
+      }
+
+      // Calculate confidence based on matches
+      if (matchResult.matchedKeywords.length > 0 || matchResult.patternMatches!.length > 0) {
+        matchResult.confidence = this.calculateMatchConfidence(
+          matchResult.matchedKeywords,
+          matchResult.patternMatches!
+        );
+        result.matches.push(matchResult);
+      }
+    }
+
+    // Scan attachments if enabled
+    if (enhancedRules.scanLocations?.attachments && email.hasAttachments && accessToken) {
+      // Implementation for attachment scanning would go here
+      // For now, we'll skip attachment content scanning but maintain the structure
+    }
+
+    // Calculate overall risk score
+    result.overallRiskScore = this.calculateOverallRiskScore(result.matches);
+    
+    return result;
+  }
+
+  private calculateMatchConfidence(keywords: string[], patterns: PatternMatch[]): number {
+    let confidence = 0;
+    
+    // Base confidence from keyword matches
+    if (keywords.length > 0) {
+      confidence += Math.min(0.5, keywords.length * 0.1);
+    }
+    
+    // Higher confidence from pattern matches (they're more specific)
+    if (patterns.length > 0) {
+      const avgPatternConfidence = patterns.reduce((sum, p) => sum + p.confidence, 0) / patterns.length;
+      confidence += avgPatternConfidence * 0.7;
+    }
+    
+    return Math.min(1.0, confidence);
+  }
+
   // Enhanced email scanning for keywords in subject, body, and attachments
   async scanEmailContent(
     email: Email, 
@@ -192,6 +314,76 @@ class PolicyEngine {
     const confidenceBonus = matches.reduce((sum, match) => sum + match.confidence, 0) / matches.length * 30;
     
     return Math.min(baseScore + confidenceBonus, 100);
+  }
+
+  // Enhanced policy checking with pattern detection
+  async checkEnhancedPolicies(email: Email, policies: Policy[], accessToken: string | null): Promise<InsertThreat[]> {
+    const threats: InsertThreat[] = [];
+
+    for (const policy of policies) {
+      if (!policy.isActive) continue;
+
+      const rules = policy.rules as any;
+      
+      // Check if this policy uses enhanced rules structure
+      if (rules.scanLocations || rules.patternDetection || rules.keywordRules) {
+        const enhancedRules: EnhancedPolicyRule = {
+          scanLocations: rules.scanLocations,
+          keywordRules: rules.keywordRules,
+          patternDetection: rules.patternDetection
+        };
+
+        const scanResult = await this.scanEmailWithEnhancedRules(email, accessToken, enhancedRules);
+        
+        if (scanResult.matches.length > 0) {
+          const threatDescription = this.generateThreatDescription(scanResult);
+          const severity = this.determineSeverity(scanResult.overallRiskScore, policy.severity);
+          
+          threats.push({
+            emailId: email.id!,
+            policyId: policy.id,
+            type: policy.type === 'dlp' ? 'dlp' : 'policy_violation',
+            severity,
+            description: threatDescription,
+            detectionMethod: 'rule_based',
+            metadata: {
+              policyName: policy.name,
+              scanResult,
+              riskScore: scanResult.overallRiskScore
+            }
+          });
+        }
+      }
+    }
+
+    return threats;
+  }
+
+  private generateThreatDescription(scanResult: EmailScanResult): string {
+    const descriptions: string[] = [];
+    
+    for (const match of scanResult.matches) {
+      if (match.matchedKeywords.length > 0) {
+        descriptions.push(`Keywords found in ${match.location}: ${match.matchedKeywords.join(', ')}`);
+      }
+      
+      if (match.patternMatches && match.patternMatches.length > 0) {
+        const patternTypes = match.patternMatches.map(p => p.type).join(', ');
+        descriptions.push(`Sensitive patterns detected in ${match.location}: ${patternTypes}`);
+      }
+    }
+    
+    return descriptions.join('; ') || 'Policy violation detected';
+  }
+
+  private determineSeverity(riskScore: number, policySeverity: string): string {
+    // Base severity on policy setting, but escalate based on risk score
+    if (riskScore >= 80) return 'critical';
+    if (riskScore >= 60) return 'high';
+    if (riskScore >= 40) return 'medium';
+    
+    // Fall back to policy severity for lower risk scores
+    return policySeverity as string;
   }
 
   async checkPolicies(email: Email, analysis: any): Promise<InsertThreat[]> {

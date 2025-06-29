@@ -27,15 +27,41 @@ import {
   Shield,
   AlertTriangle,
   FileText,
-  Target
+  Target,
+  Mail,
+  Paperclip,
+  CreditCard,
+  IdCard
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 
 const policyFormSchema = z.object({
   name: z.string().min(1, "Policy name is required"),
   description: z.string().optional(),
   type: z.enum(['dlp', 'phishing', 'malware', 'custom']),
   severity: z.enum(['low', 'medium', 'high', 'critical']),
+  
+  // Scan locations
+  scanSubject: z.boolean().default(true),
+  scanBody: z.boolean().default(true),
+  scanAttachments: z.boolean().default(false),
+  
+  // Keyword detection options
+  keywordMatchType: z.enum(['any', 'all', 'sequence']).default('any'),
   keywords: z.string().optional(),
+  caseSensitive: z.boolean().default(false),
+  wholeWordsOnly: z.boolean().default(true),
+  
+  // Advanced pattern detection
+  detectCreditCards: z.boolean().default(false),
+  detectSSN: z.boolean().default(false),
+  detectPhoneNumbers: z.boolean().default(false),
+  detectBankAccounts: z.boolean().default(false),
+  detectPassports: z.boolean().default(false),
+  
+  // Legacy fields
   senderPattern: z.string().optional(),
   attachmentTypes: z.string().optional(),
   actions: z.array(z.string()).min(1, "At least one action is required"),
@@ -71,6 +97,31 @@ export default function PolicyManagement() {
         type: data.type,
         severity: data.severity,
         rules: {
+          // Scan locations
+          scanLocations: {
+            subject: data.scanSubject,
+            body: data.scanBody,
+            attachments: data.scanAttachments,
+          },
+          
+          // Keyword detection
+          keywordRules: data.keywords ? [{
+            keywords: data.keywords.split(',').map(k => k.trim()).filter(k => k.length > 0),
+            matchType: data.keywordMatchType || 'any',
+            caseSensitive: data.caseSensitive || false,
+            wholeWords: data.wholeWordsOnly !== false,
+          }] : [],
+          
+          // Advanced pattern detection
+          patternDetection: {
+            creditCards: data.detectCreditCards || false,
+            ssn: data.detectSSN || false,
+            phoneNumbers: data.detectPhoneNumbers || false,
+            bankAccounts: data.detectBankAccounts || false,
+            passports: data.detectPassports || false,
+          },
+          
+          // Legacy fields for backward compatibility
           keywords: data.keywords ? data.keywords.split(',').map(k => k.trim()) : [],
           senderPattern: data.senderPattern || "",
           attachmentTypes: data.attachmentTypes ? data.attachmentTypes.split(',').map(t => t.trim()) : [],
@@ -161,7 +212,26 @@ export default function PolicyManagement() {
       description: "",
       type: "custom",
       severity: "medium",
+      
+      // Scan locations
+      scanSubject: true,
+      scanBody: true,
+      scanAttachments: false,
+      
+      // Keyword detection
+      keywordMatchType: "any",
       keywords: "",
+      caseSensitive: false,
+      wholeWordsOnly: true,
+      
+      // Advanced pattern detection
+      detectCreditCards: false,
+      detectSSN: false,
+      detectPhoneNumbers: false,
+      detectBankAccounts: false,
+      detectPassports: false,
+      
+      // Legacy fields
       senderPattern: "",
       attachmentTypes: "",
       actions: ["alert"],
@@ -301,30 +371,98 @@ export default function PolicyManagement() {
                     )}
                   />
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="severity"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Severity Level</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormField
+                    control={form.control}
+                    name="severity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Severity Level</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select severity" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="low">Low</SelectItem>
+                            <SelectItem value="medium">Medium</SelectItem>
+                            <SelectItem value="high">High</SelectItem>
+                            <SelectItem value="critical">Critical</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Scan Locations */}
+                  <div className="space-y-4 p-4 border rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <Mail className="h-4 w-4 text-blue-500" />
+                      <h4 className="font-medium">Scan Locations</h4>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="scanSubject"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-3 space-y-0">
                             <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select severity" />
-                              </SelectTrigger>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
                             </FormControl>
-                            <SelectContent>
-                              <SelectItem value="low">Low</SelectItem>
-                              <SelectItem value="medium">Medium</SelectItem>
-                              <SelectItem value="high">High</SelectItem>
-                              <SelectItem value="critical">Critical</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Email Subject</FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="scanBody"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Email Body</FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="scanAttachments"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Attachments</FormLabel>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Keyword Detection */}
+                  <div className="space-y-4 p-4 border rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <FileText className="h-4 w-4 text-green-500" />
+                      <h4 className="font-medium">Keyword Detection</h4>
+                    </div>
+                    
                     <FormField
                       control={form.control}
                       name="keywords"
@@ -332,12 +470,186 @@ export default function PolicyManagement() {
                         <FormItem>
                           <FormLabel>Keywords (comma-separated)</FormLabel>
                           <FormControl>
-                            <Input placeholder="urgent, confidential, wire transfer" {...field} />
+                            <Textarea 
+                              placeholder="urgent, confidential, wire transfer, bank account, password"
+                              {...field}
+                              rows={2}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="keywordMatchType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Match Type</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select match type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="any">Any Keywords (OR)</SelectItem>
+                                <SelectItem value="all">All Keywords (AND)</SelectItem>
+                                <SelectItem value="sequence">Keywords in Sequence</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="space-y-3">
+                        <FormField
+                          control={form.control}
+                          name="caseSensitive"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <div className="space-y-1 leading-none">
+                                <FormLabel>Case Sensitive</FormLabel>
+                              </div>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="wholeWordsOnly"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <div className="space-y-1 leading-none">
+                                <FormLabel>Whole Words Only</FormLabel>
+                              </div>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Advanced Pattern Detection */}
+                  <div className="space-y-4 p-4 border rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <CreditCard className="h-4 w-4 text-orange-500" />
+                      <h4 className="font-medium">Advanced Pattern Detection</h4>
+                      <Badge variant="secondary" className="text-xs">Smart Detection</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Automatically detect sensitive information with AI-powered pattern recognition to minimize false positives.
+                    </p>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-3">
+                        <FormField
+                          control={form.control}
+                          name="detectCreditCards"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <div className="space-y-1 leading-none">
+                                <FormLabel>Credit Card Numbers</FormLabel>
+                                <p className="text-xs text-muted-foreground">Visa, MasterCard, Amex formats</p>
+                              </div>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="detectSSN"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <div className="space-y-1 leading-none">
+                                <FormLabel>Social Security Numbers</FormLabel>
+                                <p className="text-xs text-muted-foreground">SSN patterns (XXX-XX-XXXX)</p>
+                              </div>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="detectBankAccounts"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <div className="space-y-1 leading-none">
+                                <FormLabel>Bank Account Numbers</FormLabel>
+                                <p className="text-xs text-muted-foreground">Account & routing numbers</p>
+                              </div>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <div className="space-y-3">
+                        <FormField
+                          control={form.control}
+                          name="detectPhoneNumbers"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <div className="space-y-1 leading-none">
+                                <FormLabel>Phone Numbers</FormLabel>
+                                <p className="text-xs text-muted-foreground">US/International formats</p>
+                              </div>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="detectPassports"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormControl>
+                              <div className="space-y-1 leading-none">
+                                <FormLabel>Passport Numbers</FormLabel>
+                                <p className="text-xs text-muted-foreground">Government ID patterns</p>
+                              </div>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex justify-end space-x-3">
