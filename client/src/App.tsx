@@ -15,9 +15,9 @@ import { Sidebar } from "@/components/ui/sidebar";
 
 function Router() {
   return (
-    <div className="min-h-screen bg-ms-gray dark:bg-background flex">
+    <div className="min-h-screen bg-ms-gray dark:bg-background">
       <Sidebar />
-      <div className="flex-1 w-0 min-w-0">
+      <div className="ml-64">
         <Switch>
           <Route path="/" component={Dashboard} />
           <Route path="/dashboard" component={Dashboard} />
