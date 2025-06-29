@@ -191,25 +191,164 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Key className="h-5 w-5" />
-                <span>API Configuration</span>
+                <span>Microsoft Graph API Configuration</span>
               </CardTitle>
               <CardDescription>
-                Manage API keys and external services
+                Configure Azure AD app registration for email security and UEBA
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Microsoft Graph API</Label>
+            <CardContent className="space-y-6">
+              {/* Connection Status */}
+              <div className="p-4 border rounded-lg bg-yellow-50 dark:bg-yellow-950">
+                <div className="flex items-center space-x-2 mb-2">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                  <span className="font-medium">Setup Required</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Configure your Azure AD app registration to enable email monitoring and user behavior analytics.
+                </p>
+              </div>
+
+              {/* Configuration Form */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="tenantId">Tenant ID</Label>
+                  <Input 
+                    id="tenantId" 
+                    placeholder="12345678-1234-1234-1234-123456789012" 
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Found in Azure Portal → Azure Active Directory → Overview
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="clientId">Client ID (Application ID)</Label>
+                  <Input 
+                    id="clientId" 
+                    placeholder="87654321-4321-4321-4321-210987654321" 
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Found in your app registration overview page
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="clientSecret">Client Secret</Label>
+                  <Input 
+                    id="clientSecret" 
+                    type="password" 
+                    placeholder="Enter client secret value"
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Create under Certificates & secrets in your app registration
+                  </p>
+                </div>
+
                 <div className="flex space-x-2">
-                  <Input placeholder="Enter Client ID" type="password" />
-                  <Button variant="outline">Update</Button>
+                  <Button>Save Configuration</Button>
+                  <Button variant="outline">Test Connection</Button>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label>Webhook URL</Label>
-                <div className="flex space-x-2">
-                  <Input placeholder="https://your-webhook-url.com" />
-                  <Button variant="outline">Test</Button>
+
+              {/* Setup Instructions */}
+              <Separator />
+              
+              <div className="space-y-4">
+                <h4 className="font-semibold">Setup Instructions</h4>
+                
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">1</div>
+                    <div>
+                      <div className="font-medium">Register App in Azure Portal</div>
+                      <div className="text-muted-foreground">
+                        Go to <span className="font-mono">portal.azure.com</span> → Azure Active Directory → App registrations
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start space-x-3">
+                    <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">2</div>
+                    <div>
+                      <div className="font-medium">Configure API Permissions</div>
+                      <div className="text-muted-foreground">Add these Microsoft Graph permissions:</div>
+                      <div className="mt-1 space-y-1">
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="outline" className="font-mono text-xs">Mail.Read</Badge>
+                          <span className="text-xs text-muted-foreground">Read user mailboxes</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="outline" className="font-mono text-xs">AuditLog.Read.All</Badge>
+                          <span className="text-xs text-muted-foreground">Read audit logs</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="outline" className="font-mono text-xs">User.Read.All</Badge>
+                          <span className="text-xs text-muted-foreground">Read user profiles</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="outline" className="font-mono text-xs">Directory.Read.All</Badge>
+                          <span className="text-xs text-muted-foreground">Read directory data</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start space-x-3">
+                    <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">3</div>
+                    <div>
+                      <div className="font-medium">Grant Admin Consent</div>
+                      <div className="text-muted-foreground">
+                        Click "Grant admin consent" to authorize the permissions
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start space-x-3">
+                    <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-bold">4</div>
+                    <div>
+                      <div className="font-medium">Enter Credentials Above</div>
+                      <div className="text-muted-foreground">
+                        Copy your Tenant ID, Client ID, and Client Secret to the form above
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Supported Features */}
+              <Separator />
+              
+              <div className="space-y-3">
+                <h4 className="font-semibold">Available Features</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 border rounded-lg">
+                    <div className="font-medium text-sm">Email Security</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Real-time email monitoring and threat detection
+                    </div>
+                  </div>
+                  <div className="p-3 border rounded-lg">
+                    <div className="font-medium text-sm">User Behavior Analytics</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Sign-in analysis and anomaly detection
+                    </div>
+                  </div>
+                  <div className="p-3 border rounded-lg">
+                    <div className="font-medium text-sm">Audit Logs</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Directory changes and administrative actions
+                    </div>
+                  </div>
+                  <div className="p-3 border rounded-lg">
+                    <div className="font-medium text-sm">Security Alerts</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Azure AD security incidents and risks
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>

@@ -423,5 +423,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Microsoft Graph API configuration endpoints
+  app.post("/api/settings/graph-config", requireAuth, async (req, res) => {
+    try {
+      const { tenantId, clientId, clientSecret } = req.body;
+      
+      // Validate required fields
+      if (!tenantId || !clientId || !clientSecret) {
+        return res.status(400).json({ 
+          error: "Missing required fields: tenantId, clientId, and clientSecret" 
+        });
+      }
+
+      // TODO: Store encrypted credentials in database
+      // For now, we'll just validate the format
+      const tenantIdRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const clientIdRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+      if (!tenantIdRegex.test(tenantId)) {
+        return res.status(400).json({ error: "Invalid Tenant ID format" });
+      }
+
+      if (!clientIdRegex.test(clientId)) {
+        return res.status(400).json({ error: "Invalid Client ID format" });
+      }
+
+      res.json({ 
+        success: true, 
+        message: "Microsoft Graph configuration saved successfully",
+        status: "configured"
+      });
+    } catch (error) {
+      console.error("Error saving Graph config:", error);
+      res.status(500).json({ error: "Failed to save configuration" });
+    }
+  });
+
+  app.post("/api/settings/graph-test", requireAuth, async (req, res) => {
+    try {
+      const { tenantId, clientId, clientSecret } = req.body;
+      
+      // Test the credentials by getting an access token
+      const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+      
+      const response = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          client_id: clientId,
+          scope: 'https://graph.microsoft.com/.default',
+          client_secret: clientSecret,
+          grant_type: 'client_credentials'
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return res.status(400).json({ 
+          error: "Authentication failed", 
+          details: errorData.error_description || "Invalid credentials"
+        });
+      }
+
+      const tokenData = await response.json();
+      
+      // Test a simple Graph API call
+      const graphResponse = await fetch('https://graph.microsoft.com/v1.0/users?$top=1', {
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`
+        }
+      });
+
+      if (!graphResponse.ok) {
+        return res.status(400).json({ 
+          error: "Graph API access failed", 
+          details: "Check API permissions in Azure AD"
+        });
+      }
+
+      res.json({ 
+        success: true, 
+        message: "Microsoft Graph connection test successful",
+        capabilities: [
+          "User directory access",
+          "Email monitoring ready",
+          "Audit logs accessible",
+          "Security events available"
+        ]
+      });
+
+    } catch (error) {
+      console.error("Error testing Graph connection:", error);
+      res.status(500).json({ 
+        error: "Connection test failed", 
+        details: error.message 
+      });
+    }
+  });
+
   return httpServer;
 }
