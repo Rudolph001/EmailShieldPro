@@ -6,6 +6,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Dashboard from "@/pages/dashboard";
 import PolicyManagement from "@/pages/policy-management";
 import EmailMonitoring from "@/pages/email-monitoring";
+import ThreatsDetected from "@/pages/threats-detected";
+import UserAccounts from "@/pages/user-accounts";
+import Analytics from "@/pages/analytics";
+import SettingsPage from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import { Sidebar } from "@/components/ui/sidebar";
 
@@ -17,8 +21,12 @@ function Router() {
         <Switch>
           <Route path="/" component={Dashboard} />
           <Route path="/dashboard" component={Dashboard} />
-          <Route path="/policy-management" component={PolicyManagement} />
           <Route path="/email-monitoring" component={EmailMonitoring} />
+          <Route path="/threats-detected" component={ThreatsDetected} />
+          <Route path="/policy-management" component={PolicyManagement} />
+          <Route path="/user-accounts" component={UserAccounts} />
+          <Route path="/analytics" component={Analytics} />
+          <Route path="/settings" component={SettingsPage} />
           <Route component={NotFound} />
         </Switch>
       </div>
