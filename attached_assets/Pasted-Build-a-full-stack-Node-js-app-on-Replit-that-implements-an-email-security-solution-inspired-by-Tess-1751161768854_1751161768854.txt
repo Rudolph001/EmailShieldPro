@@ -1,0 +1,71 @@
+Build a full-stack Node.js app on Replit that implements an email security solution inspired by Tessian.
+
+The app should do the following:
+
+Authenticate and connect to multiple Microsoft Outlook inboxes across a company using Microsoft Graph API.
+
+Use OAuth2 with environment variables for credentials.
+
+Fetch the last 5 emails for each user.
+
+Send email data (subject + body) to a Python machine learning service running locally (called via python-shell).
+
+The ML model should classify emails as "suspicious" or "safe" based on the content.
+
+Use a simple but effective text classifier like a Naive Bayes model with sklearn.
+
+For each suspicious email detected:
+
+Log detailed information to the Replit console in real-time.
+
+Trigger an alert (this can be console output initially but should be extensible to email, Slack, or webhook).
+
+Structure the project to be modular and secure:
+
+Store all sensitive credentials (client ID, tenant ID, client secret) as environment variables using Replit’s Secrets.
+
+Use clear, maintainable code files (e.g., auth.js for auth, ml_service.py for ML, index.js for main logic).
+
+Bonus Features:
+
+Add support to loop through a dynamic list of users or emails pulled from a config or database.
+
+Include detailed logging with timestamps and email metadata.
+
+Provide comments and instructions for extending the ML model or integrating with alerting systems like Slack or PagerDuty.
+
+Deliverable:
+
+A ready-to-run Replit project with clear README instructions.
+
+Code that runs immediately on Run, fetching emails, classifying them, and showing results live in the console.
+
+Please build the project with clean, production-level code and provide comments for each step.
+
+🧠 How Tessian Works & Product Links
+Tessian is a leading email security platform that uses machine learning and behavioral analytics to prevent human errors like misdirected emails and phishing attacks. It protects enterprise email by:
+
+Learning patterns of normal communication for each user and the organization
+
+Detecting anomalies like unusual recipients, suspicious content, or outbound data leaks
+
+Alerting users or admins before harmful emails are sent
+
+Automating compliance and data loss prevention without disrupting workflows
+
+🛠 Tessian Products & Features
+Tessian Human Layer Security — protects against misdirected emails and insider threats
+
+Tessian Email Data Loss Prevention (DLP) — automated content protection
+
+Tessian Outbound Email Protection — AI-based outbound threat detection
+
+Tessian Phishing Detection — AI-powered phishing and fraud prevention
+
+Summary
+This Replit project will be a simplified, self-hosted version inspired by Tessian’s core email security approach
+
+It focuses on multi-user email monitoring + ML-based classification + alerting
+
+Designed to be a foundation you can expand with better ML, alert integrations, and enterprise-grade features
+
